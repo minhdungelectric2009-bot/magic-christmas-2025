@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Magic Christmas Memories</title>
+    <title>Magic Christmas Memories - Auto Load</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Times New Roman', serif; }
         
@@ -37,9 +37,8 @@
         }
         .key { font-weight: bold; color: #fff; }
 
-        .upload-container {
-            margin-top: 15px; pointer-events: auto;
-        }
+        /* Ẩn nút upload đi vì giờ đã tự động */
+        .upload-container { margin-top: 15px; pointer-events: auto; opacity: 0.5; }
         .upload-btn {
             background: rgba(255, 215, 0, 0.1);
             border: 1px solid #d4af37; color: #d4af37;
@@ -104,11 +103,10 @@
         
         <div class="upload-container">
             <label class="upload-btn">
-                + THÊM ẢNH CỦA BẠN
+                + TẢI THÊM ẢNH KHÁC
                 <input type="file" id="file-input" multiple accept="image/*">
             </label>
         </div>
-
         <div id="debug-text" style="margin-top:10px; color: #888; font-size: 10px;">Đang khởi động AI...</div>
     </div>
 
@@ -123,44 +121,134 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'; 
         import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-        import TWEEN from 'tween';
+        import TWEEN from 'tween'; 
 
-        // --- CẤU HÌNH ---
+        // ==========================================
+        // KHU VỰC CẤU HÌNH (SỬA ẢNH TẠI ĐÂY)
+        // ==========================================
         const CONFIG = {
-            count: 600,           
+            count: 800,           
             dustCount: 300,        
             treeHeight: 35,
             treeRadius: 12,
-            colors: {
-                gold: 0xffe861,
-                emerald: 0x2bfa72, 
-                ruby: 0xff2a2a,    
-            }
+            colors: { gold: 0xffe861, emerald: 0x2bfa72, ruby: 0xff2a2a },
+            
+            // --- DANH SÁCH ẢNH CỐ ĐỊNH ---
+            // Bạn thay thế các link dưới đây bằng link ảnh của bạn.
+            // Có thể là link online hoặc đường dẫn file trong máy (VD: './img/anh1.jpg')
+            fixedImages: [
+                './images/anh1.jpg', 
+                './images/anh2.jpg', 
+                './images/anh3.jpg', 
+                './images/anh4.jpg', 
+                './images/anh5.jpg', 
+                './images/anh6.jpg', 
+                // Thêm bao nhiêu ảnh tùy thích, mỗi ảnh một dòng, cách nhau dấu phẩy
+            ]
         };
 
         const SENSITIVITY = {
-            speed: {
-                normal: 0.35, 
-                focus: 0.04    
-            },
-            range: {
-                horizontal: 5, 
-                vertical: 5    
-            }
+            speed: { normal: 0.125, focus: 0.04 },
+            range: { horizontal: 3, vertical: 3 }
         };
 
-        // --- LAYER ---
         const BLOOM_LAYER = 0; 
         const PHOTO_LAYER = 1; 
 
         let scene, camera, renderer, composer;
         let mainGroup, starMesh;
-        let particles = [];
+        let particles = []; 
         let handLandmarker, video;
         let currentMode = 'TREE'; 
         let lastVideoTime = -1;
-        let lastPredictionTime = 0;
         let focusedPhoto = null;
+        let clock = new THREE.Clock(); 
+
+        class Particle {
+            constructor(mesh, type) {
+                this.mesh = mesh;
+                this.type = type;
+                this.posTree = new THREE.Vector3();    
+                this.posExplode = new THREE.Vector3(); 
+                
+                if (type === 'PHOTO') {
+                    this.scaleBase = 0.8; 
+                } else {
+                    this.scaleBase = mesh.scale.x;
+                }
+                
+                this.rotSpeed = {
+                    x: (Math.random() - 0.5) * 2.0,
+                    y: (Math.random() - 0.5) * 2.0,
+                    z: (Math.random() - 0.5) * 2.0
+                };
+
+                this.calculatePositions(type === 'PHOTO');
+            }
+
+            calculatePositions(isPhoto) {
+                if (isPhoto) {
+                    const t = Math.random();
+                    const h = CONFIG.treeHeight;
+                    const angle = t * Math.PI * 25; 
+                    const y = (t * h) - (h / 2);
+                    const r = (1 - Math.pow(t, 0.9)) * CONFIG.treeRadius + 2; 
+                    this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
+                } else {
+                    const t = Math.random();
+                    const h = CONFIG.treeHeight;
+                    const angle = t * Math.PI * 35;
+                    const y = (t * h) - (h / 2);
+                    const r = (1 - Math.pow(t, 0.9)) * CONFIG.treeRadius + Math.random();
+                    this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
+                }
+
+                const rExplode = 6 + Math.random() * 10;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                
+                this.posExplode.set(
+                    rExplode * Math.sin(phi) * Math.cos(theta),
+                    rExplode * Math.sin(phi) * Math.sin(theta),
+                    rExplode * Math.cos(phi)
+                );
+            }
+
+            update(dt, mode, focusedTarget) {
+                let targetPos = this.posTree;
+                let targetScale = this.scaleBase;
+                
+                if (mode === 'EXPLODE') {
+                    targetPos = this.posExplode;
+                    this.mesh.rotation.x += this.rotSpeed.x * dt;
+                    this.mesh.rotation.y += this.rotSpeed.y * dt;
+                    this.mesh.rotation.z += this.rotSpeed.z * dt;
+                } else if (mode === 'FOCUS') {
+                    if (this.mesh === focusedTarget) {
+                        const desiredWorldPos = new THREE.Vector3(0, 2, 35);
+                        const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
+                        targetPos = desiredWorldPos.applyMatrix4(invMatrix);
+                        targetScale = 3.5; 
+                        this.mesh.lookAt(camera.position); 
+                    } else {
+                        targetPos = this.posExplode;
+                        targetScale = 0.1; 
+                    }
+                } else {
+                    if (this.type !== 'PHOTO') {
+                        this.mesh.rotation.x *= (1 - dt * 2);
+                        this.mesh.rotation.z *= (1 - dt * 2);
+                    }
+                }
+
+                const lerpFactor = (mode === 'FOCUS' && this.mesh === focusedTarget) ? 5.0 : 2.5;
+                this.mesh.position.lerp(targetPos, lerpFactor * dt);
+                
+                this.mesh.scale.x += (targetScale - this.mesh.scale.x) * lerpFactor * dt;
+                this.mesh.scale.y += (targetScale - this.mesh.scale.y) * lerpFactor * dt;
+                this.mesh.scale.z += (targetScale - this.mesh.scale.z) * lerpFactor * dt;
+            }
+        }
 
         async function init() {
             scene = new THREE.Scene();
@@ -180,7 +268,7 @@
                 stencil: false 
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(1); 
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
             
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.2; 
@@ -199,7 +287,6 @@
             mainGroup.add(innerLight);
 
             const renderScene = new RenderPass(scene, camera);
-            
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth/2, window.innerHeight/2), 
                 1.5, 0.4, 0.85
@@ -215,6 +302,10 @@
             createObjects();
             createDust();
             createStar();
+            
+            // --- GỌI HÀM LOAD ẢNH CỐ ĐỊNH ---
+            loadFixedImages();
+
             initMediaPipe();
 
             document.getElementById('file-input').addEventListener('change', handleImageUpload);
@@ -225,6 +316,33 @@
             setTimeout(() => loader.remove(), 800);
 
             animate();
+        }
+
+        // --- HÀM LOAD ẢNH TỰ ĐỘNG ---
+        function loadFixedImages() {
+            const loader = new THREE.TextureLoader();
+            // Cho phép tải ảnh từ domain khác (nếu server cho phép)
+            loader.setCrossOrigin('anonymous');
+
+            CONFIG.fixedImages.forEach(url => {
+                loader.load(
+                    url,
+                    (texture) => {
+                        // Cấu hình ảnh chuẩn
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        texture.minFilter = THREE.LinearFilter;
+                        texture.magFilter = THREE.LinearFilter;
+                        texture.generateMipmaps = false;
+                        
+                        // Add vào hệ thống (lấy size thật của ảnh)
+                        addPhotoToSystem(texture, texture.image.width, texture.image.height);
+                    },
+                    undefined,
+                    (err) => {
+                        console.warn("Không tải được ảnh:", url);
+                    }
+                );
+            });
         }
 
         function handleImageUpload(e) {
@@ -257,24 +375,14 @@
             const aspectRatio = imgWidth / imgHeight;
             let width = 4;
             let height = 4;
+            if (aspectRatio > 1) height = 4 / aspectRatio;
+            else width = 4 * aspectRatio;
 
-            if (aspectRatio > 1) {
-                height = 4 / aspectRatio;
-            } else {
-                width = 4 * aspectRatio;
-            }
-
-            // Khung ảnh
             const frameGeo = new THREE.BoxGeometry(width + 0.2, height + 0.2, 0.1); 
-            const frameMat = new THREE.MeshPhongMaterial({ 
-                color: 0xffd700, shininess: 30, specular: 0x111111 
-            });
+            const frameMat = new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 30, specular: 0x111111 });
             const frame = new THREE.Mesh(frameGeo, frameMat);
             
-            // ẢNH
             const photoGeo = new THREE.PlaneGeometry(width, height);
-            
-            // FIX MÀU: Dùng BasicMaterial + toneMapped: false
             const photoMat = new THREE.MeshBasicMaterial({ 
                 map: texture, 
                 side: THREE.DoubleSide,
@@ -282,7 +390,6 @@
                 transparent: false, 
                 opacity: 1
             });
-            
             const photo = new THREE.Mesh(photoGeo, photoMat);
             photo.position.z = 0.06;
 
@@ -292,52 +399,23 @@
             group.add(frame);
             group.add(photo);
             
-            const t = Math.random();
-            const angle = t * Math.PI * 35;
-            const yTree = (t * CONFIG.treeHeight) - (CONFIG.treeHeight / 2);
-            const rTree = (1 - Math.pow(t, 0.9)) * CONFIG.treeRadius + 2; 
-            
-            const posTree = new THREE.Vector3(Math.cos(angle) * rTree, yTree, Math.sin(angle) * rTree);
-            
-            const phi = Math.acos(-1 + (2 * Math.random()));
-            const theta = Math.sqrt(CONFIG.count * Math.PI) * phi;
-            const rExplode = 10 + Math.random() * 15;
-            const posExplode = new THREE.Vector3(
-                rExplode * Math.cos(theta) * Math.sin(phi),
-                rExplode * Math.sin(theta) * Math.sin(phi),
-                rExplode * Math.cos(phi)
-            );
-
-            group.position.copy(currentMode === 'TREE' ? posTree : posExplode);
-            group.scale.set(0,0,0);
+            group.scale.set(0,0,0); 
 
             mainGroup.add(group);
 
-            const p = {
-                mesh: group,
-                posTree: posTree,
-                posExplode: posExplode,
-                type: 'PHOTO',
-                rotSpeed: { x: (Math.random()-0.5)*0.01, y: (Math.random()-0.5)*0.01 }
-            };
+            const p = new Particle(group, 'PHOTO');
             particles.push(p);
-
-            new TWEEN.Tween(group.scale).to({ x:0.5, y:0.5, z:0.5 }, 1000).easing(TWEEN.Easing.Elastic.Out).start();
+            
+            new TWEEN.Tween(group.scale).to({ x:0.8, y:0.8, z:0.8 }, 1000).easing(TWEEN.Easing.Elastic.Out).start();
         }
 
         function createObjects() {
             const gemGeo = new THREE.IcosahedronGeometry(0.35, 0); 
             const boxGeo = new THREE.BoxGeometry(0.30, 0.30, 0.30);
             
-            const matGold = new THREE.MeshPhongMaterial({ 
-                color: CONFIG.colors.gold, shininess: 80, emissive: 0xffaa00, emissiveIntensity: 0.5 
-            });
-            const matEmerald = new THREE.MeshPhongMaterial({ 
-                color: CONFIG.colors.emerald, shininess: 80, emissive: 0x00ff44, emissiveIntensity: 0.8 
-            });
-            const matRuby = new THREE.MeshPhongMaterial({ 
-                color: CONFIG.colors.ruby, shininess: 80, emissive: 0xff0000, emissiveIntensity: 0.9 
-            });
+            const matGold = new THREE.MeshPhongMaterial({ color: CONFIG.colors.gold, shininess: 80, emissive: 0xffaa00, emissiveIntensity: 0.5 });
+            const matEmerald = new THREE.MeshPhongMaterial({ color: CONFIG.colors.emerald, shininess: 80, emissive: 0x00ff44, emissiveIntensity: 0.8 });
+            const matRuby = new THREE.MeshPhongMaterial({ color: CONFIG.colors.ruby, shininess: 80, emissive: 0xff0000, emissiveIntensity: 0.9 });
 
             for (let i = 0; i < CONFIG.count; i++) {
                 let mesh;
@@ -346,38 +424,12 @@
                 else if (r < 0.60) mesh = new THREE.Mesh(gemGeo, matEmerald);
                 else mesh = new THREE.Mesh(boxGeo, matRuby);
 
-                const t = i / CONFIG.count;
-                const angle = t * Math.PI * 35; 
-                const yTree = (t * CONFIG.treeHeight) - (CONFIG.treeHeight / 2);
-                const rTree = (1 - Math.pow(t, 0.9)) * CONFIG.treeRadius + Math.random();
-                
-                const posTree = new THREE.Vector3(Math.cos(angle) * rTree, yTree, Math.sin(angle) * rTree);
-
-                const phi = Math.acos(-1 + (2 * i) / CONFIG.count);
-                const theta = Math.sqrt(CONFIG.count * Math.PI) * phi;
-                const rExplode = 8 + Math.random() * 20;
-                
-                const posExplode = new THREE.Vector3(
-                    rExplode * Math.cos(theta) * Math.sin(phi),
-                    rExplode * Math.sin(theta) * Math.sin(phi),
-                    rExplode * Math.cos(phi)
-                );
-
-                mesh.position.copy(posTree);
-                mesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
                 mesh.castShadow = false; 
                 mesh.receiveShadow = false;
-                
-                mesh.layers.set(BLOOM_LAYER);
+                mesh.layers.set(BLOOM_LAYER); 
 
                 mainGroup.add(mesh);
-                particles.push({
-                    mesh: mesh,
-                    posTree: posTree,
-                    posExplode: posExplode,
-                    type: 'GEM',
-                    rotSpeed: { x: (Math.random() - 0.5) * 0.03, y: (Math.random() - 0.5) * 0.03 }
-                });
+                particles.push(new Particle(mesh, 'GEM'));
             }
         }
 
@@ -442,9 +494,8 @@
 
         async function predictWebcam() {
             const now = performance.now();
-            if (video.currentTime !== lastVideoTime && (now - lastPredictionTime > 100)) {
+            if (video.currentTime !== lastVideoTime && (now - lastVideoTime > 50)) { 
                 lastVideoTime = video.currentTime;
-                lastPredictionTime = now;
                 if (handLandmarker) {
                     const result = handLandmarker.detectForVideo(video, now);
                     processHandResult(result);
@@ -465,7 +516,6 @@
                 const damp = currentMode === 'FOCUS' ? SENSITIVITY.speed.focus : SENSITIVITY.speed.normal;
                 
                 let hX = handX * SENSITIVITY.range.horizontal; 
-                // FIX: Bỏ dấu trừ ở đây để đảo lại chiều đúng
                 let hY = handY * SENSITIVITY.range.vertical;    
 
                 if (currentMode === 'TREE') {
@@ -474,7 +524,6 @@
 
                 // ARCBALL LOGIC
                 const distance = Math.sqrt(hX*hX + hY*hY);
-
                 if (distance > 0.001) {
                     const axis = new THREE.Vector3(hY, -hX, 0).normalize();
                     const q = new THREE.Quaternion();
@@ -534,7 +583,7 @@
                 const d = worldPos.distanceTo(camPos);
                 if (d < minDist) {
                     minDist = d;
-                    closest = p;
+                    closest = p.mesh;
                 }
             });
 
@@ -548,62 +597,8 @@
             currentMode = mode;
             if (mode !== 'FOCUS') focusedPhoto = null;
 
-            particles.forEach((p) => {
-                let target, scale = p.type === 'PHOTO' ? 0.5 : 1; 
-                let easing = TWEEN.Easing.Cubic.Out;
-                let duration = 1000 + Math.random() * 500;
-
-                if (mode === 'TREE') {
-                    target = p.posTree;
-                    easing = TWEEN.Easing.Back.Out;
-                    if (p.type === 'PHOTO') scale = 0.3; 
-                } else if (mode === 'EXPLODE') {
-                    target = p.posExplode;
-                } else if (mode === 'FOCUS') {
-                    if (p === focusedPhoto) {
-                        const desiredWorldPos = new THREE.Vector3(0, 2, 30);
-                        const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert();
-                        target = desiredWorldPos.applyMatrix4(invMatrix);
-                        
-                        scale = 3.5; 
-                        duration = 800;
-                    } else {
-                        target = p.posExplode.clone().multiplyScalar(1.2);
-                        scale = 0.1;
-                    }
-                }
-
-                new TWEEN.Tween(p.mesh.position).to({ x: target.x, y: target.y, z: target.z }, duration).easing(easing).start();
-                if (p.mesh.scale.x !== scale) new TWEEN.Tween(p.mesh.scale).to({ x: scale, y: scale, z: scale }, duration).start();
-
-                if (mode === 'FOCUS' && p === focusedPhoto) {
-                    const invQuat = mainGroup.quaternion.clone().invert();
-                    const randomTilt = new THREE.Quaternion().setFromEuler(
-                        new THREE.Euler(
-                            (Math.random() - 0.5) * 0.2, 
-                            (Math.random() - 0.5) * 0.2, 
-                            (Math.random() - 0.5) * 0.1
-                        )
-                    );
-                    const finalQuat = invQuat.multiply(randomTilt);
-
-                    const qStart = p.mesh.quaternion.clone();
-                    const obj = { t: 0 };
-                    
-                    new TWEEN.Tween(obj)
-                        .to({ t: 1 }, duration)
-                        .onUpdate(() => {
-                            p.mesh.quaternion.slerpQuaternions(qStart, finalQuat, obj.t);
-                        })
-                        .start();
-
-                } else if (mode === 'EXPLODE') {
-                    new TWEEN.Tween(p.mesh.rotation).to({ x: Math.random()*6, y: Math.random()*6 }, duration).start();
-                }
-            });
-
             if (mode === 'TREE') {
-                new TWEEN.Tween(starMesh.scale).to({ x:1, y:1, z:1 }, 1000).delay(800).easing(TWEEN.Easing.Elastic.Out).start();
+                new TWEEN.Tween(starMesh.scale).to({ x:1, y:1, z:1 }, 1000).delay(500).easing(TWEEN.Easing.Elastic.Out).start();
             } else {
                 new TWEEN.Tween(starMesh.scale).to({ x:0.01, y:0.01, z:0.01 }, 500).start();
             }
@@ -616,15 +611,15 @@
             composer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function animate(time) {
+        function animate() {
             requestAnimationFrame(animate);
-            TWEEN.update(time);
+            const dt = clock.getDelta(); 
             
-            particles.forEach(p => {
-                if (currentMode === 'FOCUS' && p === focusedPhoto) return;
-                p.mesh.rotation.x += p.rotSpeed.x;
-                p.mesh.rotation.y += p.rotSpeed.y;
-            });
+            TWEEN.update(); 
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update(dt, currentMode, focusedPhoto);
+            }
 
             composer.render();
         }
