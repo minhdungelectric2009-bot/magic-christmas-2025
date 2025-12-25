@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Magic Christmas Memories - Auto Load</title>
+    <title>Magic Christmas Memories - Final Photos</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Times New Roman', serif; }
         
@@ -36,18 +36,6 @@
             display: flex; gap: 15px;
         }
         .key { font-weight: bold; color: #fff; }
-
-        /* Ẩn nút upload đi vì giờ đã tự động */
-        .upload-container { margin-top: 15px; pointer-events: auto; opacity: 0.5; }
-        .upload-btn {
-            background: rgba(255, 215, 0, 0.1);
-            border: 1px solid #d4af37; color: #d4af37;
-            padding: 8px 16px; border-radius: 4px;
-            cursor: pointer; font-size: 10px; letter-spacing: 2px;
-            transition: all 0.3s;
-        }
-        .upload-btn:hover { background: #d4af37; color: #000; }
-        #file-input { display: none; }
 
         #loader {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -100,13 +88,6 @@
             <span style="opacity: 0.3">|</span>
             <span><span class="key">👌</span> Xem Ảnh</span>
         </div>
-        
-        <div class="upload-container">
-            <label class="upload-btn">
-                + TẢI THÊM ẢNH KHÁC
-                <input type="file" id="file-input" multiple accept="image/*">
-            </label>
-        </div>
         <div id="debug-text" style="margin-top:10px; color: #888; font-size: 10px;">Đang khởi động AI...</div>
     </div>
 
@@ -124,7 +105,7 @@
         import TWEEN from 'tween'; 
 
         // ==========================================
-        // KHU VỰC CẤU HÌNH (SỬA ẢNH TẠI ĐÂY)
+        // KHU VỰC CẤU HÌNH ẢNH
         // ==========================================
         const CONFIG = {
             count: 800,           
@@ -133,17 +114,14 @@
             treeRadius: 12,
             colors: { gold: 0xffe861, emerald: 0x2bfa72, ruby: 0xff2a2a },
             
-            // --- DANH SÁCH ẢNH CỐ ĐỊNH ---
-            // Bạn thay thế các link dưới đây bằng link ảnh của bạn.
-            // Có thể là link online hoặc đường dẫn file trong máy (VD: './img/anh1.jpg')
+            // --- DANH SÁCH ẢNH CỦA BẠN ---
             fixedImages: [
-                './images/anh1.jpg', 
-                './images/anh2.jpg', 
-                './images/anh3.jpg', 
-                './images/anh4.jpg', 
-                './images/anh5.jpg', 
-                './images/anh6.jpg', 
-                // Thêm bao nhiêu ảnh tùy thích, mỗi ảnh một dòng, cách nhau dấu phẩy
+                'https://i.postimg.cc/1fVk8Bxg/anh1.jpg',
+                'https://i.postimg.cc/GHTW4K0D/anh2.jpg',
+                'https://i.postimg.cc/3d0sk1Mm/anh3.jpg',
+                'https://i.postimg.cc/rKRBDj61/anh4.jpg',
+                'https://i.postimg.cc/F7kMYptj/anh5.jpg',
+                'https://i.postimg.cc/ZCvGWHkx/anh6.jpg'
             ]
         };
 
@@ -303,12 +281,11 @@
             createDust();
             createStar();
             
-            // --- GỌI HÀM LOAD ẢNH CỐ ĐỊNH ---
+            // LOAD ẢNH
             loadFixedImages();
 
             initMediaPipe();
 
-            document.getElementById('file-input').addEventListener('change', handleImageUpload);
             window.addEventListener('resize', onWindowResize);
             
             const loader = document.getElementById('loader');
@@ -318,55 +295,31 @@
             animate();
         }
 
-        // --- HÀM LOAD ẢNH TỰ ĐỘNG ---
         function loadFixedImages() {
             const loader = new THREE.TextureLoader();
-            // Cho phép tải ảnh từ domain khác (nếu server cho phép)
             loader.setCrossOrigin('anonymous');
 
             CONFIG.fixedImages.forEach(url => {
                 loader.load(
                     url,
                     (texture) => {
-                        // Cấu hình ảnh chuẩn
                         texture.colorSpace = THREE.SRGBColorSpace;
                         texture.minFilter = THREE.LinearFilter;
                         texture.magFilter = THREE.LinearFilter;
                         texture.generateMipmaps = false;
                         
-                        // Add vào hệ thống (lấy size thật của ảnh)
-                        addPhotoToSystem(texture, texture.image.width, texture.image.height);
+                        if(texture.image.width === 0) {
+                            setTimeout(() => {
+                                 addPhotoToSystem(texture, texture.image.width, texture.image.height);
+                            }, 100);
+                        } else {
+                             addPhotoToSystem(texture, texture.image.width, texture.image.height);
+                        }
                     },
                     undefined,
-                    (err) => {
-                        console.warn("Không tải được ảnh:", url);
-                    }
+                    (err) => { console.warn("Không tải được ảnh:", url); }
                 );
             });
-        }
-
-        function handleImageUpload(e) {
-            const files = e.target.files;
-            if(!files.length) return;
-
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        new THREE.TextureLoader().load(event.target.result, (texture) => {
-                            texture.colorSpace = THREE.SRGBColorSpace; 
-                            texture.minFilter = THREE.LinearFilter;
-                            texture.magFilter = THREE.LinearFilter;
-                            texture.generateMipmaps = false; 
-                            addPhotoToSystem(texture, img.width, img.height);
-                        });
-                    };
-                };
-                reader.readAsDataURL(file);
-            });
-            if(currentMode === 'TREE') switchMode('EXPLODE');
         }
 
         function addPhotoToSystem(texture, imgWidth, imgHeight) {
