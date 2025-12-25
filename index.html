@@ -3,14 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Magic Christmas Memories - Final Photos</title>
+    <title>Gửi Em - Mùa Giáng Sinh</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Times New Roman', serif; }
         
+        /* --- UI CHÍNH (Cây thông) --- */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10;
             display: flex; flex-direction: column; align-items: center;
+            opacity: 0; /* Ẩn lúc đầu */
+            transition: opacity 3s ease; /* Hiện lên từ từ */
         }
         
         h1 {
@@ -25,40 +28,142 @@
         }
 
         .status-box {
-            margin-top: 10px;
-            padding: 8px 20px;
+            margin-top: 10px; padding: 8px 20px;
             border: 1px solid rgba(255, 215, 0, 0.3);
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
-            color: #ffd700;
-            font-size: 12px;
-            border-radius: 20px;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            color: #ffd700; font-size: 12px; border-radius: 20px;
             display: flex; gap: 15px;
         }
         .key { font-weight: bold; color: #fff; }
 
-        #loader {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.5s ease-out;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 2px solid rgba(212, 175, 55, 0.2);
-            border-top: 2px solid #d4af37; border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
         #webcam-container {
             position: absolute; bottom: 20px; right: 20px;
             width: 100px; height: 75px;
-            border: 1px solid #d4af37;
-            border-radius: 8px; overflow: hidden;
-            opacity: 0.7; z-index: 5;
-            transform: scaleX(-1);
+            border: 1px solid #d4af37; border-radius: 8px; overflow: hidden;
+            opacity: 0; z-index: 5; transform: scaleX(-1);
+            transition: opacity 1s ease;
         }
         video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* --- PHẦN INTRO (MỞ MÀN LÃNG MẠN) --- */
+        #intro-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #330000, #000); /* Nền đỏ tối lãng mạn */
+            z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        /* Hộp quà 3D CSS MỚI - Đẹp hơn */
+        .gift-container {
+            width: 120px; height: 120px;
+            position: relative;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            animation: floatGift 3s ease-in-out infinite; /* Hộp quà bay nhẹ */
+            transition: all 1s ease;
+        }
+        
+        @keyframes floatGift { 0%, 100% { transform: translateY(0) rotateY(0deg); } 50% { transform: translateY(-15px) rotateY(5deg); } }
+
+        .face {
+            position: absolute; width: 120px; height: 120px;
+            background: linear-gradient(45deg, #b30000, #ff1a1a); /* Đỏ nhung */
+            border: 2px solid #800000;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+        /* Dải ruy băng vàng óng ánh */
+        .face::before { content: ''; position: absolute; width: 25px; height: 100%; left: 47.5px; background: linear-gradient(to right, #ffd700, #ffec8b, #ffd700); box-shadow: 0 0 5px #ffd700; }
+        .face::after { content: ''; position: absolute; width: 100%; height: 25px; top: 47.5px; background: linear-gradient(to bottom, #ffd700, #ffec8b, #ffd700); box-shadow: 0 0 5px #ffd700; }
+
+        .front { transform: translateZ(60px); }
+        .back { transform: rotateY(180deg) translateZ(60px); }
+        .right { transform: rotateY(90deg) translateZ(60px); }
+        .left { transform: rotateY(-90deg) translateZ(60px); }
+        .bottom { transform: rotateX(-90deg) translateZ(60px); }
+        
+        /* Nắp hộp (Top) - Tách riêng để mở */
+        .lid-container {
+            position: absolute; width: 120px; height: 120px;
+            top: 0; left: 0;
+            transform-style: preserve-3d;
+            transform: translateZ(60px); /* Nằm trên cùng */
+            transition: transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1); /* Hiệu ứng mở mượt */
+        }
+        .face.top { 
+            transform: rotateX(90deg) translateZ(60px); /* Đặt lại vị trí cho đúng nắp */
+            background: linear-gradient(45deg, #d32f2f, #ff5252); /* Sáng hơn chút */
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+        }
+        /* Nơ trên nắp */
+        .bow {
+            position: absolute; top: -30px; left: 35px;
+            font-size: 60px; color: #ffd700; text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transform: translateZ(61px); /* Nổi lên trên nắp */
+        }
+
+        /* Hiệu ứng khi mở quà */
+        .gift-open .lid-container {
+            transform: translateZ(60px) rotateX(110deg) translateY(-60px) translateZ(-60px); /* Mở nắp lên và lùi ra sau */
+        }
+        .gift-open .gift-container {
+            animation: none; /* Dừng bay */
+            transform: translateY(200px) scale(0.8) rotateX(20deg); /* Hộp lùi xuống dưới */
+            opacity: 0; /* Mờ dần */
+        }
+        
+        /* Đã xóa CSS cũ cho click-hint, xử lý bằng JS */
+
+        .click-hint {
+            margin-top: 80px; color: #ffd700; font-size: 14px; letter-spacing: 3px; text-transform: uppercase;
+            animation: pulse 2s infinite; font-weight: bold; text-shadow: 0 0 10px #ffd700;
+            transition: opacity 0.5s; /* Thêm transition để ẩn mượt nếu cần */
+        }
+
+        /* Ánh sáng lấp lánh khi mở */
+        .sparkles {
+            position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+            box-shadow: 
+                0 0 50px 20px #ffd700, 
+                0 0 100px 40px #ffec8b,
+                0 0 150px 60px #ffffff;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0);
+            transition: all 1s ease-out;
+            z-index: -1; /* Nằm sau hộp quà */
+        }
+        .gift-open .sparkles {
+            opacity: 0.8;
+            transform: translate(-50%, -60%) scale(1); /* Nổ ánh sáng lên trên */
+        }
+
+        /* --- SLIDE CHỮ LÃNG MẠN (Đã tăng kích thước) --- */
+        .slide-text {
+            position: absolute; width: 90%; text-align: center;
+            font-size: 28px; /* Tăng size cơ bản lên */
+            line-height: 1.6;
+            color: #fceea7; /* Màu vàng kem lãng mạn */
+            text-shadow: 
+                0 1px 2px rgba(0,0,0,0.8), /* Bóng đen tạo chiều sâu */
+                0 0 15px rgba(252, 238, 167, 0.5); /* Hào quang vàng nhẹ */
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+            transition: all 1.5s ease-in-out;
+            font-style: italic; /* Chữ nghiêng lãng mạn */
+        }
+        
+        .active-slide {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .exit-slide {
+            opacity: 0;
+            transform: scale(1.1) translateY(-30px);
+        }
+
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
     </style>
 
     <script type="importmap">
@@ -74,13 +179,40 @@
 </head>
 <body>
 
-    <div id="loader">
-        <div class="spinner"></div>
-        <div style="color: #d4af37; margin-top: 15px; letter-spacing: 2px; font-size: 10px;">LOADING MEMORIES...</div>
+    <div id="intro-layer">
+        <div class="sparkles"></div> <div class="gift-container" onclick="openGift()">
+            <div class="face front"></div>
+            <div class="face back"></div>
+            <div class="face right"></div>
+            <div class="face left"></div>
+            <div class="face bottom"></div>
+            <div class="lid-container">
+                <div class="face top"></div>
+                <div class="bow">🎀</div>
+            </div>
+        </div>
+        <div class="click-hint">🎁 CHẠM ĐỂ MỞ QUÀ 🎁</div>
+
+        <div class="slide-text" id="slide1" style="font-size: 40px; font-weight: bold;">
+            Ta đaaaa..<br>
+            Quà Giáng sinh cho bạn gái của anh nè ❤️
+        </div>
+        <div class="slide-text" id="slide2" style="font-size: 24px;">
+            "Cảm ơn em vì đã đến bên cạnh anh,<br>
+            Cảm ơn em vì đã yêu anh thật lòng,<br>
+            Cảm ơn em vì đã tin tưởng anh<br>
+            Và chính cả em để hẹn ước cho tương lai đôi mình."
+        </div>
+        <div class="slide-text" id="slide3" style="font-size: 60px; color: #ff3333; text-shadow: 0 0 25px #ff3333;">
+            Anh Yêu Em ❤️
+        </div>
+        <div class="slide-text" id="slide4" style="font-size: 45px; font-weight: bold;">
+            🎄 Giáng Sinh Vui Vẻ 🎄
+        </div>
     </div>
 
     <div id="ui-layer">
-        <h1>Giáng Sinh Kỷ Niệm</h1>
+        <h1>Merii Chít mợtt</h1>
         <div class="status-box">
             <span><span class="key">✊</span> Cây Thông</span>
             <span style="opacity: 0.3">|</span>
@@ -104,17 +236,78 @@
         import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
         import TWEEN from 'tween'; 
 
+        // --- XỬ LÝ KỊCH BẢN INTRO (4 CẢNH) ---
+        window.openGift = function() {
+            const container = document.querySelector('.gift-container');
+            const introLayer = document.getElementById('intro-layer');
+            // [FIX] Chọn phần tử hint để ẩn
+            const clickHint = document.querySelector('.click-hint'); 
+            
+            // 1. Hiệu ứng mở hộp & nổ ánh sáng
+            container.classList.add('gift-open');
+            introLayer.classList.add('gift-open'); // Kích hoạt sparkles
+            
+            // [FIX] Ẩn dòng chữ nhắc nhở ngay lập tức
+            if (clickHint) {
+                clickHint.style.display = 'none';
+            }
+
+            // 2. Chạy Kịch Bản 4 Cảnh (Thời gian tính từ lúc bấm)
+            // Cảnh 1: Hiện ngay (sau 1s chờ hộp mở)
+            setTimeout(() => playSlide('slide1', 4000), 1000); 
+            
+            // Cảnh 2: Hiện sau cảnh 1 (1s + 4s + 1s nghỉ = 6s)
+            setTimeout(() => playSlide('slide2', 7000), 6000); 
+            
+            // Cảnh 3: Hiện sau cảnh 2 (6s + 7s + 1s nghỉ = 14s)
+            setTimeout(() => playSlide('slide3', 3000), 14000);
+            
+            // Cảnh 4: Hiện sau cảnh 3 (14s + 3s + 1s nghỉ = 18s)
+            setTimeout(() => playSlide('slide4', 4000), 18000);
+
+            // 3. Kết thúc Intro -> Vào Web chính (Tổng tgian = 18s + 4s = 22s)
+            setTimeout(() => {
+                const uiLayer = document.getElementById('ui-layer');
+                const webcamContainer = document.getElementById('webcam-container');
+                
+                // Fade out intro từ từ
+                introLayer.style.transition = "opacity 3s ease-in-out";
+                introLayer.style.opacity = 0;
+                
+                // Fade in main UI
+                uiLayer.style.opacity = 1;
+                webcamContainer.style.opacity = 0.7;
+
+                // Xóa intro khỏi DOM sau khi fade xong
+                setTimeout(() => { introLayer.remove(); }, 3000);
+
+            }, 22000); 
+        }
+
+        // Hàm điều khiển từng slide
+        function playSlide(id, duration) {
+            const el = document.getElementById(id);
+            
+            // Hiện slide
+            el.classList.add('active-slide');
+            
+            // Ẩn slide sau khi hết thời gian (trừ đi 1s để transition ẩn)
+            setTimeout(() => {
+                el.classList.remove('active-slide');
+                el.classList.add('exit-slide'); // Hiệu ứng thoát
+            }, duration - 1000); 
+        }
+
         // ==========================================
-        // KHU VỰC CẤU HÌNH ẢNH
+        // MAIN 3D CODE
         // ==========================================
         const CONFIG = {
-            count: 800,           
+            count: 900,           
             dustCount: 300,        
             treeHeight: 35,
             treeRadius: 12,
             colors: { gold: 0xffe861, emerald: 0x2bfa72, ruby: 0xff2a2a },
             
-            // --- DANH SÁCH ẢNH CỦA BẠN ---
             fixedImages: [
                 'https://i.postimg.cc/1fVk8Bxg/anh1.jpg',
                 'https://i.postimg.cc/GHTW4K0D/anh2.jpg',
@@ -126,8 +319,8 @@
         };
 
         const SENSITIVITY = {
-            speed: { normal: 0.125, focus: 0.04 },
-            range: { horizontal: 3, vertical: 3 }
+            speed: { normal: 0.35, focus: 0.05 },
+            range: { horizontal: 6, vertical: 6 }
         };
 
         const BLOOM_LAYER = 0; 
@@ -281,17 +474,11 @@
             createDust();
             createStar();
             
-            // LOAD ẢNH
             loadFixedImages();
 
             initMediaPipe();
 
             window.addEventListener('resize', onWindowResize);
-            
-            const loader = document.getElementById('loader');
-            loader.style.opacity = 0;
-            setTimeout(() => loader.remove(), 800);
-
             animate();
         }
 
@@ -475,7 +662,6 @@
                     hY = 0;
                 }
 
-                // ARCBALL LOGIC
                 const distance = Math.sqrt(hX*hX + hY*hY);
                 if (distance > 0.001) {
                     const axis = new THREE.Vector3(hY, -hX, 0).normalize();
